@@ -49,7 +49,6 @@ public class Student {
     // equals/hashCode/toStrin
      public Student (){
 
-
      }
 
     public Student(String id, String name, String email, List<CourseNote> notes) {
@@ -71,4 +70,14 @@ public class Student {
     public int hashCode() {
         return Objects.hash(id, name, email, notes);
     }
+    public double calculateMoyenne(){
+     if(notes.isEmpty() )return 0.0;
+     double sum=0;
+     for(CourseNote courseNote:notes){
+         sum=sum+ courseNote.getNote();
+
+     }
+     return sum/notes.size();
+    }
+
 }
