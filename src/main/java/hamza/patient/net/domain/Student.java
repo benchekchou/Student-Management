@@ -49,6 +49,7 @@ public class Student {
     // equals/hashCode/toStrin
      public Student (){
 
+
      }
 
     public Student(String id, String name, String email, List<CourseNote> notes) {
