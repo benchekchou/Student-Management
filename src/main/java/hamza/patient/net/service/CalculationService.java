@@ -1,92 +1,83 @@
 package hamza.patient.net.service;
 
-import hamza.patient.net.domain.CourseNote;
 import hamza.patient.net.domain.Student;
+import hamza.patient.net.exceptions.NotFoundException;
 import hamza.patient.net.repository.StudentRepository;
+import hamza.patient.net.service.strategy.AverageStrategy;
+import hamza.patient.net.util.Validation;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.stream.Collectors;
 
+/**
+ * Aggregates various student statistics.
+ */
 public class CalculationService {
+    private static final double FAILING_THRESHOLD = 10.0;
 
-    private final StudentRepository repo;
+    private final StudentRepository repository;
+    private final AverageStrategy averageStrategy;
 
-    public CalculationService(StudentRepository repo) {
-
-        this.repo = repo;
+    public CalculationService(StudentRepository repository, AverageStrategy averageStrategy) {
+        Validation.requireNotNull(repository, "StudentRepository");
+        Validation.requireNotNull(averageStrategy, "AverageStrategy");
+        this.repository = repository;
+        this.averageStrategy = averageStrategy;
     }
 
-    /**
-     * Calcule la moyenne d’un étudiant.
-     * @return Double arrondi à 2 décimales, ou null si l’étudiant n’a aucun cours.
-     */
     public Double computeAverage(String studentId) {
-
-        return 0.0;
+        Student student = repository.findById(studentId)
+                .orElseThrow(() -> new NotFoundException("Étudiant introuvable : " + studentId));
+        Double average = averageStrategy.compute(student);
+        return average == null ? null : roundTwoDecimals(average);
     }
 
-    /** Retourne l’étudiant avec la meilleure moyenne (tiebreak appliqué). */
     public Optional<Student> getBestStudent() {
-
-        return Optional.empty();
+        return repository.findAll().stream()
+                .filter(Student::hasCourses)
+                .max(Comparator
+                        .comparing(this::averageOfOrZero)
+                        .thenComparing(Student::getName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(Student::getId));
     }
 
-    /**
-     * Retourne la liste des étudiants en échec (moyenne STRICTEMENT < 10),
-     * triée par moyenne croissante puis par nom.
-     */
     public List<Student> getFailingStudents() {
-
-        return List.of();
+        return repository.findAll().stream()
+                .filter(Student::hasCourses)
+                .filter(student -> averageOfOrZero(student) < FAILING_THRESHOLD)
+                .sorted(Comparator
+                        .comparing(this::averageOfOrZero)
+                        .thenComparing(Student::getName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(Student::getId))
+                .collect(Collectors.toList());
     }
 
-    // ----- Helpers -----
-
-    /** Moyenne arrondie à 2 décimales, ou null si aucun cours. */
-    private Double averageOf(Student s) {
-
-        return 0.0;
-    }
-
-    /** Moyenne ou 0.0 si N/A (usage pour tri uniquement). */
-    private Double averageOfOrZero(Student s) {
-
-        return 0.0;
-    }
-
-
-    public Optional<Double> calculateMoyenne() {
-        List<Student> students = repo.findAll();
-
-        // Cas où aucune donnée n’est disponible
-        if (students == null || students.isEmpty()) {
-            return Optional.of(0.0);
+    public OptionalDouble computeGlobalAverage() {
+        List<Student> students = repository.findAll().stream()
+                .filter(Student::hasCourses)
+                .toList();
+        if (students.isEmpty()) {
+            return OptionalDouble.empty();
         }
-
-        double total = 0.0;
-        int count = 0;
-
-        for (Student student : students) {
-            double moyenne = student.calculateMoyenne();
-            if (moyenne > 0) { // on ignore les moyennes nulles ou 0
-                total += moyenne;
-                count++;
-            }
-        }
-
-        // Cas où aucune moyenne valide n’a été trouvée
-        if (count == 0) {
-            return Optional.empty();
-        }
-
-        return Optional.of(total / count);
+        double sum = students.stream()
+                .map(this::averageOfOrZero)
+                .reduce(0.0, Double::sum);
+        return OptionalDouble.of(sum / students.size());
     }
 
-    // Méthode pour retourner une liste vide si aucune donnée
-    public List<Student> getAllStudents() {
-        List<Student> students = repo.findAll();
-        return students == null ? List.of() : students;
+    private double averageOfOrZero(Student student) {
+        Double avg = averageStrategy.compute(student);
+        return avg == null ? 0.0 : avg;
     }
 
-
+    private double roundTwoDecimals(double value) {
+        return BigDecimal.valueOf(value)
+                .setScale(2, RoundingMode.HALF_UP)
+                .doubleValue();
+    }
 }

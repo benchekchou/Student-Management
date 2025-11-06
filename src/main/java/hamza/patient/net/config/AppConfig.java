@@ -6,6 +6,7 @@ import hamza.patient.net.repository.file.*;
 import hamza.patient.net.service.CalculationService;
 import hamza.patient.net.service.CourseNoteService;
 import hamza.patient.net.service.StudentService;
+import hamza.patient.net.service.strategy.SimpleAverageStrategy;
 import hamza.patient.net.util.Logger;
 
 
@@ -54,12 +55,12 @@ public class AppConfig {
         // Services
         StudentService studentService       = new StudentService(repository);
         CourseNoteService courseNoteService = new CourseNoteService(repository);
-        CalculationService calcService      = new CalculationService(repository);
+        CalculationService calcService      = new CalculationService(repository, new SimpleAverageStrategy());
 
         // Views console
         StudentViews studentViews         = new StudentViews(studentService);
         CourseViews courseViews           = new CourseViews(studentService, courseNoteService);
-        CalculationViews calculationViews = new CalculationViews(studentService, calcService);
+        CalculationViews calculationViews = new CalculationViews(calcService);
 
         // Menu (point d'entrée UI console)
         Menu menu = new Menu(studentViews, courseViews, calculationViews);
